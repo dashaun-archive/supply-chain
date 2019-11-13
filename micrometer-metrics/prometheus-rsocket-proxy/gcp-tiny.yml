@@ -1,0 +1,58 @@
+# fly -t cp set-pipeline -c gcp-pipeline.yml -p paving-pks -l gcp.yml -n
+---
+resource_types:
+  - name: terraform
+    type: docker-image
+    source:
+      repository: ljfranklin/terraform-resource
+      tag: latest
+resources:
+  - name: supply-chain
+    type: git
+    source:
+      branch: master
+      uri: git@github.com:dashaun-cloud/supply-chain.git
+      private_key: ((git_ssh_key))
+  - name: terraform
+    type: terraform
+    source:
+      env_name: ((env_name))
+      backend_type: gcs
+      backend_config:
+        bucket: prometheus-rsocket-proxy-dashaun-cloud
+        prefix: ((env_name))
+      delete_on_failure: true
+      vars:
+        project: ((project))
+        region: ((region))
+        service_account_key: ((service_account_key))
+
+jobs:
+  - name: terraform-plan
+    plan:
+      - get: supply-chain
+        trigger: false
+      - put: terraform
+        params:
+          env_name: ((env_name))
+          plan_only: true
+          terraform_source: supply-chain/micrometer-metrics/prometheus-rsocket-proxy/gcp
+  - name: terraform-apply
+    plan:
+      - get: supply-chain
+        trigger: false
+      - put: terraform
+        params:
+          env_name: ((env_name))
+          terraform_source: supply-chain/micrometer-metrics/prometheus-rsocket-proxy/gcp
+  - name: terraform-destroy
+    plan:
+      - get: supply-chain
+        trigger: false
+      - put: terraform
+        get_params:
+          action: destroy
+        params:
+          action: destroy
+          env_name: ((env_name))
+          terraform_source: supply-chain/micrometer-metrics/prometheus-rsocket-proxy/gcp
